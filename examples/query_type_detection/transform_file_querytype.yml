@@ -8,4 +8,4 @@ transform1:
     - eval_v2.1_public.json
 
   read_dir: msmarco_qna_data
-  save_dir: ../../data
+  save_dir: /kaggle/working/data

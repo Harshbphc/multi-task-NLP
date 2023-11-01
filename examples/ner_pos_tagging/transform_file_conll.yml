@@ -5,4 +5,4 @@ transform1:
     - coNLL_testa.txt
     - coNLL_testb.txt
   read_dir: coNLL_data
-  save_dir: ../../data
+  save_dir: /kaggle/working/data

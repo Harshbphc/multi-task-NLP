@@ -13,5 +13,5 @@ transform2:
     - intent_snips_train.tsv
     - intent_snips_dev.tsv
     - intent_snips_test.tsv
-  read_dir: ../../data
-  save_dir: ../../data
+  read_dir: /kaggle/working/data
+  save_dir: /kaggle/working/data

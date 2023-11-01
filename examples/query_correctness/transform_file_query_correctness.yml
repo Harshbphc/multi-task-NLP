@@ -6,4 +6,4 @@ transform1:
     - test.tsv
 
   read_dir: query_correctness_data
-  save_dir: ../../data
+  save_dir: /kaggle/working/data

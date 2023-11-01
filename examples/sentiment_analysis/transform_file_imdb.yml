@@ -3,4 +3,4 @@ transform1:
   read_file_names:
   - imdb_sentiment_data.csv
   read_dir: imdb_data
-  save_dir: ../../data
+  save_dir: /kaggle/working/data
