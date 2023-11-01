@@ -2,7 +2,7 @@ import argparse
 import os
 import json
 import multiprocessing as mp
-from keras.preprocessing.sequence import pad_sequences
+from keras.utils import pad_sequences
 from utils.data_utils import TaskType, ModelType, NLP_MODELS
 from utils.task_utils import TasksParam
 from tqdm import tqdm
