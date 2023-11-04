@@ -661,8 +661,6 @@ def main():
     #replace with labeled data waala data
 ####################################################
     ADDENDUM = 100
-    NUM_TRAIN = len(allDataTrain)
-
     indices = list(range(NUM_TRAIN))
     labeled_set = indices[:ADDENDUM]
     unlabeled_set = [x for x in indices if x not in labeled_set]
@@ -672,6 +670,8 @@ def main():
     allDataTrain, BatchSamplerTrain, multiTaskDataLoaderTrain = make_data_handlers(taskParams,
                                                                                 "train", isTrain=True,
                                                                                 gpu = allParams['gpu'],labeled_set=labeled_set)
+    
+    NUM_TRAIN = len(allDataTrain)
     ################################################################
     # if evaluation on dev set is required during training. Labels are required
     # It will occur at the end of each epoch
