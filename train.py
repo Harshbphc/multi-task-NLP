@@ -697,7 +697,8 @@ def main():
                                                                                 gpu=allParams['gpu'])
     #######################################    
     random.shuffle(unlabeled_set)
-    subset = unlabeled_set[:args['SUBSET']]
+    subset = 20000
+    subset = unlabeled_set[:subset]
     #####################################
     #making multi-task model
     allParams['num_train_steps'] = math.ceil(len(multiTaskDataLoaderTrain)/args.train_batch_size) *args.epochs // args.grad_accumulation_steps
@@ -808,7 +809,7 @@ def main():
                                 wrtDir=args.out_dir, wrtPredPath=wrtPredpath)
         #'INCREMENTAL': 8138
         incremental = 8138
-        subset = 20000
+        
         arg = query_samples(models, method, data_unlabeled, subset, labeled_set, cycle, args)
         new_list = list(torch.tensor(subset)[arg][:incremental].numpy())
         labeled_set += list(torch.tensor(subset)[arg][-incremental:].numpy())
