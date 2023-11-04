@@ -592,7 +592,7 @@ def make_data_handlers(taskParams, mode, isTrain, gpu, labeled_set=None):
                                     maxSeqLen = args.max_seq_len)
         multiTaskDataLoader = DataLoader(allData, 
                                         #  batch_sampler = batchSampler,
-                                        batch_size=args.train_batch_size
+                                        batch_size=args.train_batch_size,
                                     collate_fn=batchSamplerUtils.collate_fn,
                                     pin_memory=gpu, sampler=SubsetRandomSampler(labeled_set))
 
