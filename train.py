@@ -15,15 +15,87 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.task_utils import TasksParam   
 from utils.data_utils import METRICS, TaskType
 from models.data_manager import allTasksDataset, Batcher, batchUtils
-from torch.utils.data import Dataset, DataLoader, BatchSampler
+from torch.utils.data import Dataset, DataLoader, BatchSampler, Subset
 from logger_ import make_logger
 from models.model import multiTaskModel
 from models.eval import evaluate
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import SubsetRandomSampler, Sampler
 import torch.nn.init as init
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from typing import Iterator, Sequence
+
+class ModifiedSubsetRandomSampler(BatchSampler):
+    def __init__(self, dataObj, batchSize, shuffleTask = True, shuffleBatch = True, seed = 42):
+        '''
+        dataObj :- An instance of allTasksDataset containing data for all tasks
+        '''
+        self.dataObj = dataObj
+        self.allTasksData = dataObj.allTasksData
+        self.batchSize = batchSize
+        # to shuffle the indices in a batch
+        self.shuffleBatch = shuffleBatch
+        # to shuffle the samples picked up among all the tasks
+        self.shuffleTask = shuffleTask
+        self.seed = seed
+        
+        self.allTasksDataBatchIdxs = []
+        self.taskIdxId = []
+        for taskId, data in self.allTasksData.items():
+            self.allTasksDataBatchIdxs.append(self.make_batches(len(data)))
+            self.taskIdxId.append(taskId)
+
+    def make_batches(self, dataSize):
+        batchIdxs = [list(range(i, min(i+self.batchSize, dataSize))) for i in range(0, dataSize, self.batchSize)]
+        if self.shuffleBatch:
+            random.seed(self.seed)
+            random.shuffle(batchIdxs)
+        return batchIdxs
+
+    def make_task_idxs(self):
+        '''
+        This fn makes task indices for which a corresponding batch is created
+        eg. [0, 0, 1, 3, 0, 2, 3, 1, 1, ..] if task ids are 0,1,2,3
+        '''
+        taskIdxs = []
+        for i in range(len(self.allTasksDataBatchIdxs)):
+            taskIdxs += [i]*len(self.allTasksDataBatchIdxs[i])
+        if self.shuffleTask:
+            random.seed(self.seed)
+            random.shuffle(taskIdxs)
+        return taskIdxs
+
+    #over riding BatchSampler functions to generate iterators for all tasks
+    # and iterate
+    def __len__(self):
+        return sum(len(data) for taskId, data in self.allTasksData.items())
+
+    def __iter__(self):
+        allTasksIters = [iter(item) for item in self.allTasksDataBatchIdxs]
+        #all_iters = [iter(item) for item in self._train_data_list]
+        allIdxs = self.make_task_idxs()
+        for taskIdx in allIdxs:
+            # this batch belongs to a specific task id
+            batchTaskId = self.taskIdxId[taskIdx]
+            random.shuffle(allTasksIters[taskIdx])
+            batch = next(allTasksIters[taskIdx])
+            yield [(batchTaskId, sampleIdx) for sampleIdx in batch]
+            
+    def patch_data(self, batch_info, batch_data, gpu = None):
+        if gpu:
+            for i, part in enumerate(batch_data):
+                if part is not None:
+                    if isinstance(part, torch.Tensor):
+                        batch_data[i] = part.pin_memory().cuda(non_blocking=True)
+                    elif isinstance(part, tuple):
+                        batch_data[i] = tuple(sub_part.pin_memory().cuda(non_blocking=True) for sub_part in part)
+                    elif isinstance(part, list):
+                        batch_data[i] = [sub_part.pin_memory().cuda(non_blocking=True) for sub_part in part]
+                    else:
+                        raise TypeError("unknown batch data type at %s: %s" % (i, part))
+
+        return batch_info, batch_data
 
 class SubsetSequentialSampler(torch.utils.data.Sampler):
     r"""Samples elements sequentially from a given list of indices, without replacement.
@@ -581,20 +653,21 @@ def make_data_handlers(taskParams, mode, isTrain, gpu, labeled_set=None):
         allTaskslist.append(taskDict)
 
     allData = allTasksDataset(allTaskslist)
+    labeled_subset = Subset(allData, labeled_set)
     if mode == "train":
         batchSize = args.train_batch_size
     else:
         batchSize = args.eval_batch_size
 
     if labeled_set is not None:
-        batchSampler = Batcher(allData, batchSize=batchSize, seed = args.seed)
+        batchSampler = ModifiedSubsetRandomSampler(labeled_subset, batchSize=batchSize, seed = args.seed)
         batchSamplerUtils = batchUtils(isTrain = isTrain, modelType= taskParams.modelType,
                                     maxSeqLen = args.max_seq_len)
         multiTaskDataLoader = DataLoader(allData, 
-                                        #  batch_sampler = batchSampler,
+                                         batch_sampler = batchSampler,
                                         batch_size=args.train_batch_size,
                                     collate_fn=batchSamplerUtils.collate_fn,
-                                    pin_memory=gpu, sampler=SubsetRandomSampler(labeled_set))
+                                    pin_memory=gpu)
 
     else:   
         batchSampler = Batcher(allData, batchSize=batchSize, seed = args.seed)
